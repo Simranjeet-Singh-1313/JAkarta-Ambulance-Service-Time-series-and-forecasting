@@ -1,0 +1,1585 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "name": "Time_Series_assignment.ipynb",
+      "private_outputs": true,
+      "provenance": [],
+      "authorship_tag": "ABX9TyPROFvb421/oin2Mb3ilNTt",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/Simranjeet-Singh-1313/JAkarta-Ambulance-Service-Time-series-and-forecasting/blob/main/Jakarta_Ambulance_Service_Time_Series_and%20_Forecasting\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "L-IApWDm6uT7"
+      },
+      "source": [
+        "!pip install arch"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "BgPsDvMhgpws"
+      },
+      "source": [
+        "import warnings\n",
+        "warnings.filterwarnings('ignore')\n",
+        "import pandas as pd\n",
+        "import scipy, os\n",
+        "import numpy as np\n",
+        "import matplotlib.pyplot as plt\n",
+        "\n",
+        "import statsmodels.api as sm\n",
+        "from statsmodels.tsa.arima_process import ArmaProcess\n",
+        "\n",
+        "\n",
+        "from statsmodels.tsa.stattools import kpss\n",
+        "from statsmodels.tsa.stattools import adfuller\n",
+        "\n",
+        "from arch.unitroot import PhillipsPerron\n",
+        "from statsmodels.sandbox.regression.predstd import wls_prediction_std\n",
+        "from sklearn.metrics import mean_squared_error\n",
+        "from sklearn.metrics import mean_absolute_error\n",
+        "\n",
+        "from statsmodels.tsa.arima_model import ARIMA\n",
+        "from statsmodels.tsa.holtwinters import ExponentialSmoothing\n",
+        "\n",
+        "from arch import arch_model\n",
+        "from scipy.stats import shapiro\n",
+        "from scipy.stats import probplot\n",
+        "from statsmodels.stats.diagnostic import het_arch\n",
+        "from statsmodels.graphics.tsaplots import plot_acf, plot_pacf\n",
+        "from statsmodels.stats.diagnostic import acorr_ljungbox\n"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "_Yrqt7FfPj0t"
+      },
+      "source": [
+        "from google.colab import drive\n",
+        "drive.mount(\"/content/drive\")"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "zNsMRmx6QAVM"
+      },
+      "source": [
+        "# Set Base-directory \n",
+        "basedir='/content/drive/MyDrive/Timeseries.Assignment'"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "6mKwF-AkD6yv"
+      },
+      "source": [
+        "## Preprocessing part"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "ey7IyaAliwhW"
+      },
+      "source": [
+        "df=pd.read_excel(os.path.join(basedir,'TimeSeriesCourseworkData20_21.xlsx'))\n",
+        "df"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "PYrsC83jIaQx"
+      },
+      "source": [
+        "df[\"Call_Date\"]=[d.date() for d in df['Call']]\n",
+        "df[\"Call_Time\"]=[d.time() for d in df[\"Call\"]]\n",
+        "df=df.drop(\"Call\",axis=1)\n",
+        "df"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "tYQ1_HU7LPQe"
+      },
+      "source": [
+        "df[\"Number_of_Calls\"]=df[\"Call_Date\"].map(df.groupby(\"Call_Date\").size())\n",
+        "df=df.drop_duplicates(\"Call_Date\")\n",
+        "df.head(5)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "sLrHsNFqn8Qq"
+      },
+      "source": [
+        "df.tail(10)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "6nJslOCKsT0v"
+      },
+      "source": [
+        "df=df.drop([\"City Municipality\",\"Call_Time\"],axis=1)\n",
+        "df"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "2YFep6U1oqh8"
+      },
+      "source": [
+        "df.tail(10)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "WT-hL2UMUzEU"
+      },
+      "source": [
+        "df=df.set_index(\"Call_Date\")\n",
+        "df.head()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "fgZKY_k9205I"
+      },
+      "source": [
+        "df"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "BQBj3ogu25ej"
+      },
+      "source": [
+        "# remove first value of data which is outlier \n",
+        "df=df[1:]\n",
+        "df"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "V861UXoOeyfu"
+      },
+      "source": [
+        "df.describe()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "nq73C4RU_Phg"
+      },
+      "source": [
+        "df"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "kwNEdxZsEFlV"
+      },
+      "source": [
+        "## Define function"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "OL9Oa3f6Tyau"
+      },
+      "source": [
+        "#helper function to plot the time series data\n",
+        "def plot_pred(pred,title):\n",
+        "    plt.figure(figsize=(17,5))\n",
+        "    plt.plot(train_data,label='Train')\n",
+        "    plt.plot(test_data,label='Actual')\n",
+        "    plt.plot(pred,label='Predicted')\n",
+        "    plt.ylabel(\"Jakarta Ambulance Prediction\")\n",
+        "    plt.title(title,fontsize=20)\n",
+        "    plt.legend()\n",
+        "    plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "vJWGO1iSnZPo"
+      },
+      "source": [
+        "# Function Check_data check what percentage of data lies in the range mean +_ 3*sigma\n",
+        "def check_data(x):\n",
+        "    sigma = x.std()\n",
+        "    mean = x.mean()\n",
+        "    c = 0 \n",
+        "    for i in range(len(x)):\n",
+        "        if x[i] > (mean -3*sigma) and x[i] < (mean + 3*sigma):\n",
+        "            c = c + 1\n",
+        "    per_data = (c/len(x))*100\n",
+        "\n",
+        "    print(f'Percentage of data between mean-3*sigma and mean+3*sigma is : {per_data}')\n",
+        "    "
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "ZKzlO9K3rX9l"
+      },
+      "source": [
+        "\n",
+        "#define function for ADF test\n",
+        "def Adf_test(series):\n",
+        "    #Perform Dickey-Fuller test:\n",
+        "    print ('Results of Dickey-Fuller Test:')\n",
+        "    dftest = adfuller(series, autolag='AIC')\n",
+        "    dfoutput = pd.Series(dftest[0:4], index=['Test Statistic','p_value','#Lags Used','Number of Observations Used'])\n",
+        "    for key,value in dftest[4].items():\n",
+        "       dfoutput['Critical Value (%s)'%key] = value\n",
+        "    print (dfoutput)\n",
+        "    print(f'Result: The series is {\"not \" if dftest[1] > 0.05 else \"\"}stationary')\n",
+        "          "
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "SXwOcKTej977"
+      },
+      "source": [
+        "#Define function for KPSS test\n",
+        "def kpss_test(series, **kw):    \n",
+        "    statistic, p_value, n_lags, critical_values = kpss(series, **kw)\n",
+        "    # Format Output\n",
+        "    print(f'KPSS Statistic: {statistic}')\n",
+        "    print(f'p-value: {p_value}')\n",
+        "    print(f'num lags: {n_lags}')\n",
+        "    print('Critial Values:')\n",
+        "    for key, value in critical_values.items():\n",
+        "        print(f'   {key} : {value}')\n",
+        "    print(f'Result: The series is {\"not \" if p_value < 0.05 else \"\"}stationary')"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "5RSKmMSeTcfS"
+      },
+      "source": [
+        "# Define function for PP test\n",
+        "def pp_test(series):    \n",
+        "    pp = PhillipsPerron(series)\n",
+        "    print(pp.summary().as_text())"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "oKJAoAbVcPxH"
+      },
+      "source": [
+        "import math\n",
+        "# WE will check if there is some missing value\n",
+        "df = df.Number_of_Calls\n",
+        "miss = []\n",
+        "for j in range(len(df)):\n",
+        "    if math.isnan(df[j])== True:\n",
+        "        miss.append(j)\n",
+        "print(miss)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "IZN9oNkkDauz"
+      },
+      "source": [
+        "#Plot Decomposition Figure\n",
+        "decomposed=sm.tsa.seasonal_decompose(df,model=\"additive\",freq=6)\n",
+        "figure = decomposed.plot()\n",
+        "plt.figure(figsize=(18,15))\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "jLAQIP8rTiIS"
+      },
+      "source": [
+        "# PLOT the given time series data\n",
+        "plt.figure(figsize=(15, 7))\n",
+        "plt.plot(df)\n",
+        "plt.title('Number of Calls each Day')\n",
+        "plt.grid(True)\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "yz810LaELdig"
+      },
+      "source": [
+        ""
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "voJj2H_ScZQ5"
+      },
+      "source": [
+        "#split dataset into training set and testing set\n",
+        "train_data = df[:-45]\n",
+        "test_data = df[-45:]\n",
+        "\n",
+        "# print(train_data)\n",
+        "# print(test_data)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "G9crN3yemmHz"
+      },
+      "source": [
+        "# PLOT the Train and Test Data in a single plot\n",
+        "plt.figure(figsize=(15, 7))\n",
+        "plt.plot(train_data.index, train_data)\n",
+        "plt.plot(test_data.index, test_data)\n",
+        "plt.title('Jakarta Ambulance Dataset')\n",
+        "plt.grid(True)\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "IG3zoLcvilGC"
+      },
+      "source": [
+        "## Linear Regression"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "kml57gXk_Gj7"
+      },
+      "source": [
+        "df=pd.DataFrame(df)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "NlCe_2fV-QTp"
+      },
+      "source": [
+        "X=np.arange(df.index.size)\n",
+        "fit=np.polyfit(X,df.Number_of_Calls,deg=1)\n",
+        "print(\"slope :\"+str(fit[0]))\n",
+        "print(\"Intercept :\"+str(fit[1]))\n"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "ziMzSzcQBQdZ"
+      },
+      "source": [
+        "fit_Function=np.poly1d(fit)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "mDkiUcGOUe6z"
+      },
+      "source": [
+        "Lin_Reg_Pre=fit_Function(X)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "iABu_nBUTnlR"
+      },
+      "source": [
+        "Pre_Date=pd.date_range(start=\"2019-01-01\",end=\"2019-05-31\",freq=\"D\")\n",
+        "Pre_Date=pd.DataFrame(Pre_Date)\n",
+        "Pre_Date.columns=['Date']\n",
+        "Pre_Date.set_index(['Date'],inplace=True)\n",
+        "Pre_Date[\"Number_of_Calls\"]=Lin_Reg_Pre\n"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "Dc0473JxTYGv"
+      },
+      "source": [
+        "MSE=mean_squared_error(Pre_Date,df)\n",
+        "RMSE=np.sqrt(MSE)\n",
+        "MAE=mean_absolute_error(Pre_Date,df)\n",
+        "print(\"The Mean Squar error of Linear Regression model is: \",MSE)\n",
+        "print(\"The Root Mean Squre error of Linear Regression Model is:\",RMSE)\n",
+        "print(\"The Mean Absolute error of Linear Regression Model is:\",MAE)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "8ugz5nbcA4ve"
+      },
+      "source": [
+        "prediction = fit_Function(df.index.size + 7)\n",
+        "print(\"Prediction of Linear Regression:\",prediction)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "FnYf7IdNatzd"
+      },
+      "source": [
+        "pri=list(np.repeat(prediction,7))"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "4DOPcXlCZ4WQ"
+      },
+      "source": [
+        "Prediction_Date=pd.date_range(start=\"2019-06-01\",end=\"2019-06-07\",freq=\"D\")\n",
+        "Prediction_Date=pd.DataFrame(Prediction_Date)\n",
+        "Prediction_Date.columns=['Date']\n",
+        "Prediction_Date.set_index(['Date'],inplace=True)\n",
+        "Prediction_Date[\"Number_of_Calls\"]=pri\n",
+        "Prediction_Date"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "-ZxbIfdU-QQs"
+      },
+      "source": [
+        "plt.plot(df.index,fit_Function(X))\n",
+        "plt.plot(df.index,df.Number_of_Calls,)\n",
+        "plt.plot(Prediction_Date)\n",
+        "plt.xlabel('Date')\n",
+        "plt.ylabel('Number Of Calls')\n",
+        "plt.title('Linear Regression')\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "CwvJtYKeUpxd"
+      },
+      "source": [
+        "## Mean Method\n",
+        "\n",
+        "\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "SkfWTt-7UpDU"
+      },
+      "source": [
+        "# Mean of previous values\n",
+        "\n",
+        "y_av = pd.Series(np.repeat(train_data.mean(),45),index=test_data.index)\n",
+        "MSE=mean_squared_error(y_av,test_data)\n",
+        "RMSE=np.sqrt(MSE)\n",
+        "MAE=mean_absolute_error(y_av,test_data)\n",
+        "print(\"The Mean Squar error of Mean model model is: \",MSE)\n",
+        "print(\"The Root Mean Squre error of Mean Model is:\",RMSE)\n",
+        "print(\"The Mean Absolute error of Mean Model is:\",MAE)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "b2otKZVHklJZ"
+      },
+      "source": [
+        "Average_pre=pd.date_range(start=\"2019-06-01\",end=\"2019-06-07\",freq=\"D\")\n",
+        "Average_pre=pd.DataFrame(Average_pre)\n",
+        "Average_pre.columns=['Date']\n",
+        "Average_pre.set_index(['Date'],inplace=True)\n",
+        "mean=float(test_data.mean())\n",
+        "Average_pre[\"Number_of_Calls\"]=mean\n",
+        "Average_pre"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "Aht7sm37xF9X"
+      },
+      "source": [
+        "Average_pre=Average_pre.squeeze()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "LFhSwTQtx9Wp"
+      },
+      "source": [
+        "plt.figure(figsize=(17,5))\n",
+        "plt.plot(train_data,label='Train')\n",
+        "plt.plot(test_data,label='Actual')\n",
+        "plt.plot(y_av,label='Predicted')\n",
+        "plt.plot(Average_pre,label=\"Forcast\")\n",
+        "plt.ylabel(\"Jakarta Ambulance Prediction\")\n",
+        "plt.title(\"Mean Method\",fontsize=20)\n",
+        "plt.legend()\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "oGb68SI-WAcq"
+      },
+      "source": [
+        "## Moving Average"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "hoXDudhRWGPc"
+      },
+      "source": [
+        "# Moving Average Of Three Days\n",
+        "moving_Ave=test_data.rolling(3).mean()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "x5ATXx7TvD5y"
+      },
+      "source": [
+        "List=[179.33333,163.6667,139.3334]\n",
+        "for i in range(7):\n",
+        "  Three_day_Moving_AVG=(List[-1]+List[-2]+List[-3])/3\n",
+        "  List.append(Three_day_Moving_AVG)\n",
+        "new_list=List[3:]"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "vFA2OuA4wry6"
+      },
+      "source": [
+        "# Forecasting through moving Average model.\n",
+        "Mov_Avg_For=pd.date_range(start=\"2019-06-01\",end=\"2019-06-07\",freq=\"D\")\n",
+        "Mov_Avg_For=pd.DataFrame(Mov_Avg_For)\n",
+        "Mov_Avg_For.columns=['Date']\n",
+        "Mov_Avg_For.set_index(['Date'],inplace=True)\n",
+        "Mov_Avg_For[\"Number_of_Calls\"]=new_list\n",
+        "Mov_Avg_For"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "ayv2FLITWGMd"
+      },
+      "source": [
+        "moving_Ave.dropna(axis=0,inplace=True)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "viFnA0e740Eq"
+      },
+      "source": [
+        "MSE=mean_squared_error(moving_Ave,test_data[2:])\n",
+        "RMSE=np.sqrt(MSE)\n",
+        "MAE=mean_absolute_error(moving_Ave,test_data[2:])\n",
+        "print(\"The Mean Squar error of Moving Average model is: \",MSE)\n",
+        "print(\"The Root Mean Squre error of Moving Average Model is:\",RMSE)\n",
+        "print(\"The Mean Absolute error of Moving Average Model is:\",MAE)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "SgVSvLBsWGKI"
+      },
+      "source": [
+        "plt.figure(figsize=(17,5))\n",
+        "plt.plot(train_data,label='Train Data')\n",
+        "plt.plot(test_data,label='Test Data')\n",
+        "plt.plot(moving_Ave,label='Predicted')\n",
+        "plt.plot(Mov_Avg_For,label=\"Forcast\")\n",
+        "plt.ylabel(\"Jakarta Ambulance Prediction\")\n",
+        "plt.title(\"Moving Average\",fontsize=20)\n",
+        "plt.legend()\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "LQ7CzMi6nva4"
+      },
+      "source": [
+        "\n",
+        "k = train_data.kurtosis()\n",
+        "s = train_data.skew()\n",
+        "print(f'Kurtosis: {k}')\n",
+        "print(f'skew: {s}')"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "oW33W4hEn2Yj"
+      },
+      "source": [
+        "# Check the data Lie between Mean-3*sigma and Mean+3*sigma\n",
+        "check_data(train_data)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "0ei5NukO3cJH"
+      },
+      "source": [
+        "## Autocorrelation and PartialAutocorrelation\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "dGGZrk5qo97d"
+      },
+      "source": [
+        "plot_acf(train_data)\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "AZJhhxv2p5ty"
+      },
+      "source": [
+        "plot_pacf(train_data)\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "mAcwCl7vrnHt"
+      },
+      "source": [
+        "##Detection Stationary "
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "nayGtcAADzwq"
+      },
+      "source": [
+        "df=pd.DataFrame(df)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "1278Nj5Pqlec"
+      },
+      "source": [
+        "Adf_test(train_data)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "OJ7uyB4uqxDX"
+      },
+      "source": [
+        "# warnings.filterwarnings('ignore')\n",
+        "kpss_test(train_data)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "3mM62CBj7FF_"
+      },
+      "source": [
+        "pp_test(train_data)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "tyEwj3M6r55F"
+      },
+      "source": [
+        "## Converting Series into Log\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "drlny_jv2Dm0"
+      },
+      "source": [
+        "#converting series into log serie to get stationary series\n",
+        "df['log_ret'] = np.log(df) - np.log(df.shift(1))\n",
+        "r_t = df['log_ret']\n",
+        "print(r_t)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "IyoWRXDUshWU"
+      },
+      "source": [
+        "from google.colab import drive\n",
+        "drive.mount('/content/drive')"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "VUo1nXAD4MdB"
+      },
+      "source": [
+        "# Here we drop all NaN value\n",
+        "r_t = r_t.dropna()\n",
+        "print(r_t)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "8mlnRDRR4beq"
+      },
+      "source": [
+        "plt.figure(figsize=(15, 7))\n",
+        "plt.plot(r_t)\n",
+        "plt.title('Jakarta Ambulance Time series')\n",
+        "plt.grid(True)\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "n1zdIsdY4jRg"
+      },
+      "source": [
+        "# Break the data as test and train Data\n",
+        "\n",
+        "logtrain_data = r_t[:-45]\n",
+        "logtest_data = r_t[-45:]\n",
+        "# print(logtrain_data)\n",
+        "# print(logtest_data)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "RRez4Otq4tcE"
+      },
+      "source": [
+        "# PLot the logtrain and logtest data in a single ts graph\n",
+        "\n",
+        "plt.figure(figsize=(15, 7))\n",
+        "plt.plot(logtrain_data.index, logtrain_data)\n",
+        "plt.plot(logtest_data.index, logtest_data)\n",
+        "plt.title('Jakarta Ambulance Dataset converted into Logrithmic series')\n",
+        "plt.grid(True)\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "pn8tTYRe43HW"
+      },
+      "source": [
+        "logtrain_data.describe()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "GdJQgEHh5HnP"
+      },
+      "source": [
+        "k = logtrain_data.kurtosis()\n",
+        "s = logtrain_data.skew()\n",
+        "print(f'Kurtosis: {k}')\n",
+        "print(f'skew: {s}')"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "R9IzBGqU5Pg-"
+      },
+      "source": [
+        "check_data(logtrain_data)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "JY0shJ3Y5gIu"
+      },
+      "source": [
+        "plot_acf(logtrain_data)\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "01Fnbvtf5l9A"
+      },
+      "source": [
+        "\n",
+        "plot_pacf(logtrain_data)\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "EP2u_eg6CXlp"
+      },
+      "source": [
+        "df_new=pd.DataFrame(logtrain_data)\n",
+        "# df_new"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "0CKk1Q2C4mL_"
+      },
+      "source": [
+        "## Stationary Detection After converting  Log series\n"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "bz-rbnkj5pu4"
+      },
+      "source": [
+        "Adf_test(logtrain_data)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "KLV7SocM50wQ"
+      },
+      "source": [
+        "kpss_test(logtrain_data)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "o3NgxPnh57Br"
+      },
+      "source": [
+        "pp_test(logtrain_data)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "Xd1lY4U1g2vN"
+      },
+      "source": [
+        "## ARIMA Model"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "xE8knROo6RDQ"
+      },
+      "source": [
+        "# for paprameter selection \n",
+        "# Input m and n are the maximum possible value of parameter p and q respectively.\n",
+        "def par_sel (m,n):\n",
+        "    AB = {}\n",
+        "    for p in range(m):\n",
+        "        for q in range(n):\n",
+        "            try:\n",
+        "                mod = ARIMA(logtrain_data, order= (p,0,q))\n",
+        "                result = mod.fit()\n",
+        "                AB[(p,q)] = [result.aic, result.bic]\n",
+        "            except:\n",
+        "                continue\n",
+        "    return AB"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "leOv1yOW8DZy"
+      },
+      "source": [
+        "import warnings\n",
+        "warnings.filterwarnings(\"ignore\")\n",
+        "par_sel (5,5)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "Yi3dHU94hekF"
+      },
+      "source": [
+        "\n",
+        "# FIT appropriate ARIMA model\n",
+        "p = 4\n",
+        "q = 2\n",
+        "mod = ARIMA(logtrain_data, order =(p,0,q))\n",
+        "result = mod.fit()\n",
+        "print(result.aic)\n",
+        "\n",
+        "# Compare AIC and BIC value for p = 2 and q = 4\n",
+        "print(result.aic, result.bic)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "R797AVyZhjPO"
+      },
+      "source": [
+        "#Forecast on logtest_data\n",
+        "history = [x for x in logtrain_data]\n",
+        "predictions = list()\n",
+        "for t in range(len(logtest_data)):\n",
+        "    model= ARIMA(history, order=(4,0,2))\n",
+        "    model_fit = model.fit(disp=0)\n",
+        "    output = model_fit.forecast()\n",
+        "    yhat = output[0]\n",
+        "    predictions.append(yhat)\n",
+        "    obs = logtest_data[t]\n",
+        "    history.append(obs)\n",
+        "    # print('predicted=%f, expected=%f' % (yhat, obs))\n",
+        "error = mean_squared_error(test_data, predictions)\n",
+        "print('Test MSE: %.3f' % error)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "62ZaV_MdBuSq"
+      },
+      "source": [
+        "model_fit.summary()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "qU0fkuwKiIk3"
+      },
+      "source": [
+        "fin_pred = [train_data[-1]]\n",
+        "# print(fin_pred)\n",
+        "for i in range(len(test_data)):\n",
+        "    x = fin_pred[-1]\n",
+        "    y = predictions[i]\n",
+        "    fin_pred.append(x*math.exp(y))\n",
+        "fin_pred = fin_pred[1:]"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "votxVVYljAeP"
+      },
+      "source": [
+        "# for j in range(len(fin_pred)):\n",
+        "    # print(fin_pred[j],\":\", test_data[j])"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "nD6c4vRNdVcH"
+      },
+      "source": [
+        "MSE= mean_squared_error(fin_pred, test_data)\n",
+        "RMSE=np.sqrt(MSE)\n",
+        "MAE=mean_absolute_error(fin_pred, test_data)\n",
+        "print(\"The Mean Squar error of ARIMA model is: \",MSE)\n",
+        "print(\"The Root Mean Squre error of ARIMA Model is:\",RMSE)\n",
+        "print(\"The Mean Absolute error of ARIMA Model is:\",MAE)\n"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "ijdDUQyLnyLy"
+      },
+      "source": [
+        "# for paprameter selection \n",
+        "# Input m and n are the maximum possible value of parameter p and q respectively.\n",
+        "def par_sel (m,n):\n",
+        "    AB = {}\n",
+        "    for p in range(m):\n",
+        "        for q in range(n):\n",
+        "            try:\n",
+        "                mod = ARIMA(logtest_data, order= (p,0,q))\n",
+        "                result = mod.fit()\n",
+        "                AB[(p,q)] = [result.aic, result.bic]\n",
+        "            except:\n",
+        "                continue\n",
+        "    return AB"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "s8uE-feCn716"
+      },
+      "source": [
+        "import warnings\n",
+        "warnings.filterwarnings(\"ignore\")\n",
+        "par_sel (5,5)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "gw4rhWr9Cxnf"
+      },
+      "source": [
+        "history_1=[x for x in logtest_data]\n",
+        "forcast_ARIMA=ARIMA(history_1,order=(2,0,1)).fit()\n",
+        "forcast1=forcast_ARIMA.forecast(7)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "-9QyT75C-gMD"
+      },
+      "source": [
+        "forcast_ARIMA.summary()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "dyUh58GheE7W"
+      },
+      "source": [
+        "Arima_for=pd.date_range(start=\"2019-06-01\",end=\"2019-06-07\",freq=\"D\")\n",
+        "Arima_for=pd.DataFrame(Arima_for)\n",
+        "Arima_for.columns=['Date']\n",
+        "Arima_for.set_index(['Date'],inplace=True)\n",
+        "# Arima_for"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "N9fbv9E0e_N9"
+      },
+      "source": [
+        "Number_of_Calls=list()\n",
+        "for i in list(range(len(Arima_for))):\n",
+        "  X=forcast1[0][i]\n",
+        "  # print(type(X))\n",
+        "  Number_of_Calls.append(X)\n",
+        "# Number_of_Calls"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "gYS5sGlfdamO"
+      },
+      "source": [
+        "final_prediction = [test_data[-1]]\n",
+        "for i in range(len(Arima_for)):\n",
+        "    x = final_prediction[-1]\n",
+        "    y = Number_of_Calls[i]\n",
+        "    final_prediction.append(x*math.exp(y))\n",
+        "final_prediction= final_prediction[1:]"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "dGB0YoOHkQWJ"
+      },
+      "source": [
+        "# print Dataframe for Prediction Of Number Of Calls by ARIMA \n",
+        "Arima_for[\"Number_of_Calls\"]=final_prediction\n",
+        "Arima_for"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "GAHDHy6BLYU1"
+      },
+      "source": [
+        "print(df.Number_of_Calls.mean(),np.sqrt(df.Number_of_Calls.var()))"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "FOW4aCsmv_4i"
+      },
+      "source": [
+        "test_data=pd.DataFrame(test_data)\n",
+        "test_data\n",
+        "new_df=test_data.drop(\"Number_of_Calls\",axis=1)\n",
+        "fin_pred=pd.DataFrame(fin_pred)\n",
+        "# fin_pred"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "VndhtEd4Vk4E"
+      },
+      "source": [
+        "new_df.index\n",
+        "fin_pred.index=new_df.index\n",
+        "fin_pred.columns=[\"Number_of_predicted_Calls\"]"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "AEfFtyLzdfNm"
+      },
+      "source": [
+        "#Plot Arima Model\n",
+        "plt.figure(figsize=(17,5))\n",
+        "plt.plot(train_data,label='Train Data')\n",
+        "plt.plot(test_data,label='Test Data')\n",
+        "plt.plot(fin_pred,label='Predicted')\n",
+        "plt.plot(Arima_for,label=\"Forcast\")\n",
+        "plt.ylabel(\"Jakarta Ambulance Prediction\")\n",
+        "plt.title(\"ARIMA Model\",fontsize=20)\n",
+        "plt.legend()\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "7ZJR0whpR_Xr"
+      },
+      "source": [
+        "# HOLT Winters"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "a7Zms2Mg8nOH"
+      },
+      "source": [
+        "# Holt Winter Model fit on training set\n",
+        "model=ExponentialSmoothing(logtrain_data,trend='additive',seasonal='add',seasonal_periods=29).fit()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "6lD1Ilju8yLL"
+      },
+      "source": [
+        "# test_forcast=holt_win_model.forecast(46)\n",
+        "test_forcast=model.predict(start=\"2019-04-17\",end=\"2019-05-31\")"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "Tuz0rgh99GFg"
+      },
+      "source": [
+        "final_forcast=[train_data[-1]]\n",
+        "for i in range(len(test_forcast)):\n",
+        "  x=final_forcast[-1]\n",
+        "  y=test_forcast[i]\n",
+        "  final_forcast.append(x*math.exp(y))\n",
+        "holt_forcast1=pd.DataFrame(final_forcast)\n",
+        "holt_forcast1[\"Call_Date\"]=pd.date_range(start=\"2019-04-16\",end=\"2019-05-31\",freq=\"D\")\n",
+        "holt_forcast1.index=holt_forcast1[\"Call_Date\"]"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "GE53e2-0JXEs"
+      },
+      "source": [
+        "MSE = mean_squared_error(final_forcast[1:], test_data)\n",
+        "RMSE=np.sqrt(MSE)\n",
+        "MAE=mean_absolute_error(final_forcast[1:], test_data)\n",
+        "print(\"The Mean Squar error of Holt Winter model is: \",MSE)\n",
+        "print(\"The Root Mean Squre error of Holt Winter Model is:\",RMSE)\n",
+        "print(\"The Mean Absolute error of Holt Winter Model is:\",MAE)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "_HFSENAKASGa"
+      },
+      "source": [
+        "holt_forcast1.drop([\"Call_Date\"],inplace=True,axis=1)"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "Q_ofFXH8fAam"
+      },
+      "source": [
+        "holt_win_model=ExponentialSmoothing(logtest_data,trend='additive',seasonal='additive',seasonal_periods=7).fit()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "2lDMFSG9f_3-"
+      },
+      "source": [
+        "test_pred1=holt_win_model.predict(start=\"2019-06-01\",end=\"2019-06-07\")"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "aDBInwDYgdAo"
+      },
+      "source": [
+        "final_pred=[test_data.Number_of_Calls[-1]]\n",
+        "for i in range(len(test_pred1)):\n",
+        "  x=final_pred[-1]\n",
+        "  y=test_pred1[i]\n",
+        "  final_pred.append(x*math.exp(y))\n",
+        "holt_pre=pd.DataFrame(final_pred)\n",
+        "holt_pre[\"Call_Date\"]=pd.date_range(start=\"2019-06-01\",periods=8,freq=\"D\")\n",
+        "# holt_pre.index=test_pred.index"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "wqXdt_KJln4K"
+      },
+      "source": [
+        "holt_pre=holt_pre[:7]\n",
+        "holt_pre=holt_pre.set_index(\"Call_Date\")\n",
+        "holt_pre=holt_pre.set_axis(['Number_of_Calls'], axis='columns')\n",
+        "holt_pre=holt_pre.set_axis(['Number_of_Calls'], axis='columns')"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "VIbIUjQ27GJf"
+      },
+      "source": [
+        "# Print DataFrame of Holt Winter Prediction Number Of Calls\n",
+        "holt_pre"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "o_5GiYuabrbF"
+      },
+      "source": [
+        "# Plot Holt Winter Method\n",
+        "plt.figure(figsize=(17,5))\n",
+        "plt.plot(train_data,label='Train Data')\n",
+        "plt.plot(test_data,label='Test Data')\n",
+        "plt.plot(holt_forcast1,label='prediction')\n",
+        "plt.plot(holt_pre,label='Forcast')\n",
+        "plt.ylabel(\"Jakarta Ambulance Prediction\")\n",
+        "plt.title(\"Holt Winters\",fontsize=20)\n",
+        "plt.legend()\n",
+        "plt.show()"
+      ],
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "id": "7J2HetW6H86z"
+      },
+      "source": [
+        ""
+      ],
+      "execution_count": null,
+      "outputs": []
+    }
+  ]
+}
